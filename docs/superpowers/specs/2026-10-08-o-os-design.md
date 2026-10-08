@@ -27,7 +27,7 @@ hardening, or release engineering.
 
 ### Success criteria
 
-1. O boots in QEMU and on a real x86_64 laptop (16 GB+ RAM).
+1. O boots in QEMU and on a real x86_64 laptop (8 GB+ RAM).
 2. First boot presents an account-creation form; exactly one account can ever
    exist; subsequent boots require its password.
 3. The boot-to-chat flow is: kernel → init → chat window. Nothing else is
@@ -54,7 +54,7 @@ hardening, or release engineering.
 
 | Requirement | Decision |
 |---|---|
-| Target hardware | x86_64 laptop/PC, 16 GB+ RAM, CPU-only inference |
+| Target hardware | x86_64 laptop/PC, **8 GB+ RAM**, CPU-only inference |
 | Primary dev target | QEMU x86_64 (`qemu-system-x86_64`); real hardware is final validation |
 | Boot experience | Full-screen chat TUI on tty1; no getty, no desktop |
 | Action model | Confirm-then-execute agent loop |
@@ -203,6 +203,12 @@ time, always explain before proposing, never invent packages not in the repo).
 - Performance expectation: ~10–25 tok/s CPU generation on the target class;
   streaming makes this acceptable.
 
+**Memory budget (8 GB target).** Context is capped at 8K tokens by default
+(config-adjustable; optionally q8_0 KV-cache quantization halves the cache).
+The model spike enforces: total `llama-server` RSS ≤ 3.5 GB at 8K context.
+Budget: OS ~0.2 GB + model runtime ~3–3.5 GB + chatd ~0.15 GB → ~3.5–4 GB
+free for user workloads.
+
 ## 6. Package system
 
 Buildroot selects packages at compile time; O needs runtime installation.
@@ -312,7 +318,8 @@ Linux container (Docker/Podman) or natively on CI Linux runners:
   against a **mock llama-server** (streaming, tool-call shapes, malformed
   calls); blocklist matcher.
 - **Integration (QEMU, scripted via serial console):** boot → first-boot form
-  → login → "install htop" → confirm → assert binary present. Runs in CI.
+  → login → "install htop" → confirm → assert binary present. Runs in CI with
+  `-m 8G` to enforce the memory budget.
 - **Model spike:** as §5.5 — scripted scenarios × 3 candidate models; winner
   is baked.
 - **CI:** GitHub Actions Linux runners: image build (native) + QEMU boot test
