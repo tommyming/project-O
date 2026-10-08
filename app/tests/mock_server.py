@@ -20,6 +20,37 @@ def sse_event(delta: dict | None = None, finish: str | None = None) -> str:
     return f"data: {json.dumps({'choices': [choice]})}\n\n"
 
 
+def SSE_TEXT(text: str) -> str:
+    """A complete stream carrying one text answer."""
+    return sse_event(delta={"content": text}) + "data: [DONE]\n\n"
+
+
+def SSE_TOOL(name: str, arguments: dict, call_id: str = "call_1") -> str:
+    """A complete stream carrying exactly one tool call."""
+    tc = {
+        "index": 0,
+        "id": call_id,
+        "type": "function",
+        "function": {"name": name, "arguments": json.dumps(arguments)},
+    }
+    return sse_event(delta={"tool_calls": [tc]}) + "data: [DONE]\n\n"
+
+
+def SSE_MIXED(text: str, name: str, arguments: dict, call_id: str = "call_1") -> str:
+    """A stream with a text delta followed by a tool call."""
+    tc = {
+        "index": 0,
+        "id": call_id,
+        "type": "function",
+        "function": {"name": name, "arguments": json.dumps(arguments)},
+    }
+    return (
+        sse_event(delta={"content": text})
+        + sse_event(delta={"tool_calls": [tc]})
+        + "data: [DONE]\n\n"
+    )
+
+
 class _Handler(BaseHTTPRequestHandler):
     server_version = "MockLlama/1.0"
 
