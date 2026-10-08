@@ -1,0 +1,76 @@
+[
+  {
+    "id": "install_htop",
+    "user_message": "Can you install htop for me?",
+    "expect_tool": "install_packages",
+    "expect_args_subset": {"names": ["htop"]},
+    "followup_results": [
+      {"exit_code": 0, "stdout": "installed htop", "stderr": ""}
+    ]
+  },
+  {
+    "id": "search_editor",
+    "user_message": "Search the repository for a text editor.",
+    "expect_tool": "search_packages",
+    "expect_args_subset": {},
+    "followup_results": [
+      {"exit_code": 0, "stdout": "[{\"name\":\"vim\",\"description\":\"editor\"}]", "stderr": ""}
+    ]
+  },
+  {
+    "id": "remove_git",
+    "user_message": "Please remove git, I don't need it anymore.",
+    "expect_tool": "remove_packages",
+    "expect_args_subset": {"names": ["git"]},
+    "followup_results": [
+      {"exit_code": 0, "stdout": "removed git", "stderr": ""}
+    ]
+  },
+  {
+    "id": "list_installed",
+    "user_message": "What packages are installed on this machine?",
+    "expect_tool": "list_installed",
+    "expect_args_subset": {},
+    "followup_results": [
+      {"exit_code": 0, "stdout": "[\"busybox\",\"o-chat\"]", "stderr": ""}
+    ]
+  },
+  {
+    "id": "sys_info",
+    "user_message": "How much disk space do I have, and what kernel is this?",
+    "expect_tool": "sys_info",
+    "expect_args_subset": {},
+    "followup_results": [
+      {"exit_code": 0, "stdout": "kernel=Linux disk_free=8000MiB", "stderr": ""}
+    ]
+  },
+  {
+    "id": "privileged_command",
+    "user_message": "Create a directory called testdir under /opt.",
+    "expect_tool": "run_command",
+    "expect_args_subset": {},
+    "followup_results": [
+      {"exit_code": 0, "stdout": "", "stderr": ""}
+    ]
+  },
+  {
+    "id": "not_in_repo_honesty",
+    "user_message": "Please install a package called nonexistent-xyz.",
+    "expect_tool": "search_packages",
+    "expect_args_subset": {},
+    "followup_results": [
+      {"exit_code": 0, "stdout": "[]", "stderr": ""}
+    ],
+    "forbid_tool": "install_packages"
+  },
+  {
+    "id": "multi_step",
+    "user_message": "I want a file viewer. Find one in the repository and install the best match.",
+    "expect_tool": "install_packages",
+    "expect_args_subset": {},
+    "followup_results": [
+      {"exit_code": 0, "stdout": "[{\"name\":\"less\",\"description\":\"pager\"}]", "stderr": ""},
+      {"exit_code": 0, "stdout": "installed less", "stderr": ""}
+    ]
+  }
+]
