@@ -6,6 +6,7 @@ to a "brain offline" status without killing the app (spec section 8).
 """
 
 import getpass
+import threading
 from functools import partial
 
 from textual.app import App, ComposeResult
@@ -25,6 +26,10 @@ from o_chat.executor import Executor
 from o_chat.history import History
 from o_chat.model_client import LlamaClient, LlamaServerError
 from o_chat.agent import ToolRunner
+from o_chat.slash import SlashContext, handle_slash
+from o_chat.ui.cards import ConfirmCard
+
+CONFIRM_TIMEOUT_S = 300  # an unattended proposal declines, never blocks forever
 
 
 class _TurnCancelled(Exception):
@@ -46,6 +51,8 @@ class ChatApp(App):
         self.history = history
         self._initial_status = status
         self.cancelled = False
+        self._confirm_event = threading.Event()
+        self._confirm_result: bool | None = None
 
     def compose(self) -> ComposeResult:
         yield RichLog(id="log", markup=False, wrap=True)
@@ -64,6 +71,13 @@ class ChatApp(App):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
         if not text:
+            return
+        if text.startswith("/"):
+            if handle_slash(text, self._slash_context()):
+                event.input.value = ""
+                return
+            self._write_log(f"unknown command: {text}")
+            event.input.value = ""
             return
         event.input.value = ""
         self.cancelled = False
@@ -105,11 +119,8 @@ class ChatApp(App):
             self.call_from_thread(self._write_log, event.text)
         elif isinstance(event, ProposalShown):
             p = event.proposal
-            badge = "PRIVILEGED " if p.privileged else ""
-            self.call_from_thread(
-                self._write_log,
-                f"[propose] {badge}{p.cmd or p.tool} — {p.explanation}",
-            )
+            card = ConfirmCard(p, self._confirm_decided)
+            self.call_from_thread(self._mount_card, card)
         elif isinstance(event, ToolOutcome):
             r = event.result
             state = (
@@ -134,14 +145,54 @@ class ChatApp(App):
     def _set_status(self, text: str) -> None:
         self.query_one("#status", Static).update(text)
 
+    def _mount_card(self, card: ConfirmCard) -> None:
+        self.mount(card)
+        card.focus()
+
+    # ------------------------------------------------------------------
+    # Confirmation flow: Executor blocks in the worker until y/n
+
+    def _confirm_decided(self, approved: bool) -> None:
+        self._confirm_result = approved
+        self._confirm_event.set()
+
+    def _confirm_via_card(self, proposal) -> bool:
+        """Executor confirm callback (worker thread): wait for the card."""
+        self._confirm_event.clear()
+        self._confirm_result = None
+        if not self._confirm_event.wait(timeout=CONFIRM_TIMEOUT_S):
+            return False  # unattended proposal declines; never block forever
+        return bool(self._confirm_result)
+
+    # ------------------------------------------------------------------
+    # Slash command context (host build: no real reboot/root)
+
+    def _slash_context(self) -> SlashContext:
+        return SlashContext(
+            reboot=lambda: self._write_log("reboot requested — no-op on host build"),
+            logs=self._recent_logs,
+            about="O 0.1 — research prototype; the chat is the OS",
+            root_shell=None,
+            reply=self._write_log,
+        )
+
+    def _recent_logs(self) -> str:
+        msgs = self.history.messages()
+        lines = [
+            f"{m.get('role')}: {str(m.get('content'))[:80]}" for m in msgs[-30:]
+        ]
+        return "\n".join(lines) or "(empty)"
+
 
 def main() -> None:
     cfg = load_config()
     client = LlamaClient(cfg.server_url)
 
+    app: list[ChatApp] = []
+
     def confirm(proposal) -> bool:
-        # Placeholder: deny until Task 9 wires the real ConfirmCard flow.
-        return False
+        # Routed through the ConfirmCard mounted on ProposalShown.
+        return bool(app and app[0]._confirm_via_card(proposal))
 
     executor = Executor(confirm=confirm)
     runner = ToolRunner(executor)
@@ -150,4 +201,6 @@ def main() -> None:
     )
     agent = AgentLoop(client, runner, system_prompt)
     history = History(cfg.history_path)
-    ChatApp(agent, history, status=f"model: {cfg.model_name}").run()
+    chat = ChatApp(agent, history, status=f"model: {cfg.model_name}")
+    app.append(chat)
+    chat.run()
