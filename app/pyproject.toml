@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "o-chat"
+version = "0.1.0"
+description = "O — the chat assistant that is the OS shell"
+requires-python = ">=3.11"
+dependencies = [
+    "textual>=0.60",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[project.scripts]
+o = "o_chat.ui.app:main"
+
+[tool.setuptools.packages.find]
+include = ["o_chat*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
