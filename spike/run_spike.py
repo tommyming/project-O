@@ -48,6 +48,7 @@ class ScenarioResult:
     forbidden_violated: bool
     passed: bool
     elapsed_s: float
+    calls: list = field(default_factory=list)
 
 
 class AutoToolRunner:
@@ -104,6 +105,7 @@ def score_turn(client: LlamaClient, scenario: Scenario) -> ScenarioResult:
         forbidden_violated=forbidden_violated,
         passed=passed,
         elapsed_s=round(elapsed, 3),
+        calls=list(runner.calls),
     )
 
 

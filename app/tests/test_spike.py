@@ -68,6 +68,7 @@ def test_correct_tool_and_args_passes():
     assert result.tool_valid and result.tool_correct and result.completed
     assert result.passed is True
     assert result.tool_calls_used == 1
+    assert result.calls == [("install_packages", {"names": ["htop"]})]
 
 
 def test_wrong_tool_fails():
