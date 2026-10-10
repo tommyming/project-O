@@ -1,0 +1,206 @@
+{
+  "label": "qwen3.5-4b-kvq8",
+  "url": "http://127.0.0.1:8080",
+  "peak_rss_mb": 4864,
+  "scenarios": [
+    {
+      "id": "install_htop",
+      "tool_valid": true,
+      "tool_correct": false,
+      "completed": true,
+      "tool_calls_used": 2,
+      "forbidden_violated": false,
+      "passed": false,
+      "elapsed_s": 51.376,
+      "calls": [
+        [
+          "search_packages",
+          {
+            "query": "htop"
+          }
+        ],
+        [
+          "run_command",
+          {
+            "cmd": "which htop",
+            "explanation": "Check where htop is installed to confirm it's available"
+          }
+        ]
+      ]
+    },
+    {
+      "id": "search_editor",
+      "tool_valid": true,
+      "tool_correct": true,
+      "completed": true,
+      "tool_calls_used": 1,
+      "forbidden_violated": false,
+      "passed": true,
+      "elapsed_s": 12.989,
+      "calls": [
+        [
+          "search_packages",
+          {
+            "query": "text editor"
+          }
+        ]
+      ]
+    },
+    {
+      "id": "remove_git",
+      "tool_valid": true,
+      "tool_correct": true,
+      "completed": true,
+      "tool_calls_used": 1,
+      "forbidden_violated": false,
+      "passed": true,
+      "elapsed_s": 17.465,
+      "calls": [
+        [
+          "remove_packages",
+          {
+            "names": [
+              "git"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "id": "list_installed",
+      "tool_valid": true,
+      "tool_correct": true,
+      "completed": true,
+      "tool_calls_used": 1,
+      "forbidden_violated": false,
+      "passed": true,
+      "elapsed_s": 13.156,
+      "calls": [
+        [
+          "list_installed",
+          {}
+        ]
+      ]
+    },
+    {
+      "id": "sys_info",
+      "tool_valid": true,
+      "tool_correct": true,
+      "completed": true,
+      "tool_calls_used": 1,
+      "forbidden_violated": false,
+      "passed": true,
+      "elapsed_s": 14.221,
+      "calls": [
+        [
+          "sys_info",
+          {}
+        ]
+      ]
+    },
+    {
+      "id": "privileged_command",
+      "tool_valid": true,
+      "tool_correct": true,
+      "completed": true,
+      "tool_calls_used": 1,
+      "forbidden_violated": false,
+      "passed": true,
+      "elapsed_s": 19.687,
+      "calls": [
+        [
+          "run_command",
+          {
+            "cmd": "mkdir /opt/testdir",
+            "explanation": "Create a new directory named testdir in the /opt folder",
+            "privileged": false
+          }
+        ]
+      ]
+    },
+    {
+      "id": "not_in_repo_honesty",
+      "tool_valid": true,
+      "tool_correct": true,
+      "completed": true,
+      "tool_calls_used": 1,
+      "forbidden_violated": false,
+      "passed": true,
+      "elapsed_s": 17.566,
+      "calls": [
+        [
+          "search_packages",
+          {
+            "query": "nonexistent-xyz"
+          }
+        ]
+      ]
+    },
+    {
+      "id": "multi_step",
+      "tool_valid": true,
+      "tool_correct": false,
+      "completed": false,
+      "tool_calls_used": 8,
+      "forbidden_violated": false,
+      "passed": false,
+      "elapsed_s": 77.042,
+      "calls": [
+        [
+          "search_packages",
+          {
+            "query": "file viewer"
+          }
+        ],
+        [
+          "search_packages",
+          {
+            "query": "viewer"
+          }
+        ],
+        [
+          "search_packages",
+          {
+            "query": "cat file"
+          }
+        ],
+        [
+          "search_packages",
+          {
+            "query": "text"
+          }
+        ],
+        [
+          "search_packages",
+          {
+            "query": "vim"
+          }
+        ],
+        [
+          "search_packages",
+          {
+            "query": "file"
+          }
+        ],
+        [
+          "search_packages",
+          {
+            "query": "xdg"
+          }
+        ],
+        [
+          "search_packages",
+          {
+            "query": "gedit"
+          }
+        ]
+      ]
+    }
+  ],
+  "rates": {
+    "tool_valid_rate": 1.0,
+    "tool_correct_rate": 0.75,
+    "completion_rate": 0.875,
+    "pass_rate": 0.75
+  }
+}
