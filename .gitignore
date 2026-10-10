@@ -9,3 +9,6 @@ dist/
 
 # Superpowers plan workspaces
 .superpowers/
+
+# Spike model weights
+spike/models/

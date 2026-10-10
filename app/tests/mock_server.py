@@ -73,6 +73,26 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        if isinstance(entry, dict):
+            if "no_done" in entry:
+                payload = entry["no_done"].encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                self.close_connection = True
+                return
+            if "truncate" in entry:
+                payload = entry["truncate"].encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                # Lie about the length: client read raises IncompleteRead.
+                self.send_header("Content-Length", str(len(payload) + 64))
+                self.end_headers()
+                self.wfile.write(payload)
+                self.close_connection = True
+                return
 
         payload = entry.encode("utf-8")
         self.send_response(200)

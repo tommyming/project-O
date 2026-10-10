@@ -202,15 +202,34 @@ class AgentLoop:
 
             text = "".join(text_parts)
 
-            if not tool_acc:
+            call = None
+            if tool_acc:
+                # Spec: one tool call at a time; take the first slot.
+                call = next(iter(tool_acc.values()))
+            elif grammar and text.strip():
+                # Grammar-constrained retry: the whole completion is forced
+                # to bare JSON and arrives as content. Recognize it.
+                try:
+                    candidate = json.loads(text)
+                    if isinstance(candidate, dict) and isinstance(
+                        candidate.get("name"), str
+                    ):
+                        call = {
+                            "id": None,
+                            "name": candidate["name"],
+                            "arguments": json.dumps(
+                                candidate.get("arguments", {})
+                            ),
+                        }
+                except json.JSONDecodeError:
+                    call = None
+
+            if call is None:
                 entry = {"role": "assistant", "content": text}
                 history.append(entry)
                 new_entries.append(entry)
                 emit(TurnComplete("done"))
                 return new_entries
-
-            # Spec: one tool call at a time; take the first accumulated slot.
-            call = next(iter(tool_acc.values()))
             call_id = call["id"] or f"call_{call_seq}"
             call_seq += 1
             assistant_entry = {
@@ -283,4 +302,10 @@ def _render_result(result: ExecResult) -> str:
         else f"timed_out" if result.timed_out
         else f"exit={result.exit_code}"
     )
-    return f"{status}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    text = f"{status}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    raw = text.encode("utf-8")
+    if len(raw) > 4096:
+        notice = "\n[output truncated]"
+        cut = raw[: 4096 - len(notice)]
+        return cut.decode("utf-8", "replace") + notice
+    return text

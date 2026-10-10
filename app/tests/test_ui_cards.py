@@ -1,7 +1,7 @@
 """ConfirmCard: y/n gating rendered as a distinct card with a privilege badge."""
 
 from textual.app import App, ComposeResult
-from textual.widgets import Static
+from textual.widgets import Input, Static
 
 from o_chat.agent import ProposalShown
 from o_chat.executor import Proposal
@@ -73,6 +73,21 @@ async def test_chat_app_mounts_card_on_proposal(tmp_path):
         cards = app.query(ConfirmCard)
         assert len(cards) == 1
         assert "PRIVILEGED" in str(cards[0].content)
+
+
+async def test_input_refocused_after_card_decision(tmp_path):
+    agent = FakeAgent(script=[ProposalShown(PRIV)])
+    app = ChatApp(agent, History(tmp_path / "h.jsonl"))
+    async with app.run_test() as pilot:
+        app.query_one("#input").value = "install htop"
+        await pilot.press("enter")
+        await app.workers.wait_for_complete()
+        card = app.query(ConfirmCard)[0]
+        card.focus()
+        assert isinstance(app.focused, ConfirmCard)
+        await pilot.press("y")
+        await pilot.pause()
+        assert isinstance(app.focused, Input)
 
 
 async def test_slash_input_routed_to_tui_not_agent(tmp_path):

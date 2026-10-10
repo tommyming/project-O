@@ -85,10 +85,12 @@ class ChatApp(App):
         self.run_worker(partial(self._run_turn, text), thread=True, exclusive=True)
 
     def _run_turn(self, text: str) -> None:
+        # Persist the user message before the turn: a crashed or cancelled
+        # turn must not silently drop what the user said (spec section 8).
+        prior = self.history.messages()
+        self.history.append(role="user", content=text)
         try:
-            new_entries = self.agent.turn(
-                text, self._emit, self.history.messages()
-            )
+            new_entries = self.agent.turn(text, self._emit, prior)
         except _TurnCancelled:
             self.call_from_thread(self._set_status, "cancelled")
             return
@@ -100,7 +102,7 @@ class ChatApp(App):
         except Exception as e:  # worker guard: never kill the chat window
             self.call_from_thread(self._set_status, f"error: {e}")
             return
-        for entry in new_entries:
+        for entry in new_entries[1:]:  # user message already persisted
             self.history.append(
                 role=entry["role"],
                 content=entry.get("content"),
@@ -119,7 +121,7 @@ class ChatApp(App):
             self.call_from_thread(self._write_log, event.text)
         elif isinstance(event, ProposalShown):
             p = event.proposal
-            card = ConfirmCard(p, self._confirm_decided)
+            card = ConfirmCard(p, self._on_card_decided)
             self.call_from_thread(self._mount_card, card)
         elif isinstance(event, ToolOutcome):
             r = event.result
@@ -155,6 +157,12 @@ class ChatApp(App):
     def _confirm_decided(self, approved: bool) -> None:
         self._confirm_result = approved
         self._confirm_event.set()
+
+    def _on_card_decided(self, approved: bool) -> None:
+        self._confirm_decided(approved)
+        # The card is dead after deciding; on a TTY-only OS there is no
+        # mouse to click away with — return the keyboard to the input.
+        self.query_one("#input", Input).focus()
 
     def _confirm_via_card(self, proposal) -> bool:
         """Executor confirm callback (worker thread): wait for the card."""

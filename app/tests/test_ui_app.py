@@ -87,6 +87,37 @@ async def test_esc_during_turn_sets_cancelled(tmp_path):
         await app.workers.wait_for_complete()
 
 
+async def test_user_message_persisted_when_agent_errors(tmp_path):
+    agent = FakeAgent(error=LlamaServerError("boom"))
+    history = History(tmp_path / "h.jsonl")
+    app = ChatApp(agent, history)
+    async with app.run_test() as pilot:
+        app.query_one("#input").value = "please help"
+        await pilot.press("enter")
+        await app.workers.wait_for_complete()
+    assert history.messages() == [{"role": "user", "content": "please help"}]
+
+
+async def test_stale_worker_events_discarded(tmp_path):
+    gate = threading.Event()
+    stale = FakeAgent(script=[TextDelta("STALE")], gate=gate)
+    fresh = FakeAgent(script=[TextDelta("fresh answer")])
+    app = ChatApp(stale, History(tmp_path / "h.jsonl"))
+    async with app.run_test() as pilot:
+        app.query_one("#input").value = "one"
+        await pilot.press("enter")  # stale worker starts, blocks on gate
+        await pilot.pause()
+        app.agent = fresh  # user starts a new turn before the old one ends
+        app.query_one("#input").value = "two"
+        await pilot.press("enter")
+        await pilot.pause()
+        gate.set()  # stale worker resumes — its turn is over
+        await app.workers.wait_for_complete()
+        text = log_text(app)
+        assert "STALE" not in text
+        assert "fresh answer" in text
+
+
 async def test_server_error_shows_offline_and_app_survives(tmp_path):
     agent = FakeAgent(error=LlamaServerError("connection refused"))
     app = ChatApp(agent, History(tmp_path / "h.jsonl"))

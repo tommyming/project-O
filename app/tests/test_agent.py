@@ -1,5 +1,7 @@
 """AgentLoop: the confirm-then-execute state machine over streamed events."""
 
+import json
+
 import pytest
 
 from o_chat.agent import (
@@ -134,6 +136,22 @@ def test_mixed_turn_emits_text_and_gates_tool():
     assert runner.calls == [("install_packages", {"names": ["jq"]})]
 
 
+def test_grammar_retry_parses_json_content_as_tool_call():
+    # On a grammar-constrained retry the whole completion is forced to
+    # bare JSON, which arrives as content rather than tool_calls.
+    runner = FakeToolRunner()
+    script = [
+        SSE_TOOL("delete_everything", {}),
+        SSE_TEXT(json.dumps({"name": "install_packages",
+                             "arguments": {"names": ["htop"]}})),
+        SSE_TEXT("Installed htop."),
+    ]
+    events, _, mock = run_turn(script, runner)
+    assert reasons(events) == ["done"]
+    assert runner.calls == [("install_packages", {"names": ["htop"]})]
+    assert "grammar" in mock.requests[1]
+
+
 def test_tool_call_limit():
     runner = FakeToolRunner()
     script = [SSE_TOOL("sys_info", {}, call_id=f"c{i}") for i in range(9)]
@@ -142,6 +160,19 @@ def test_tool_call_limit():
     outcomes = [e for e in events if isinstance(e, ToolOutcome)]
     assert len(outcomes) == 8
     assert len(runner.calls) == 8
+
+
+def test_tool_result_feedback_byte_truncated():
+    # Spec 5.3: at most 4096 bytes of tool output re-enter model context.
+    # The executor truncates each stream separately; the joined render
+    # must enforce the budget on the final string.
+    runner = FakeToolRunner(results=[ExecResult(0, "A" * 4000, "B" * 4000)])
+    events, messages, _ = run_turn([VALID_INSTALL, SSE_TEXT("done")], runner)
+    tool_msgs = [m for m in messages if m.get("role") == "tool"]
+    assert len(tool_msgs) == 1
+    content = tool_msgs[0]["content"]
+    assert len(content.encode("utf-8")) <= 4096
+    assert content.endswith("[output truncated]")
 
 
 def test_system_prompt_template():

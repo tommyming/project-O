@@ -4,6 +4,7 @@ stdlib-only (urllib): the OS image carries no extra HTTP dependency.
 Spec section 5.5: llama-server serves 127.0.0.1:8080 with --jinja.
 """
 
+import http.client
 import json
 from dataclasses import dataclass, field
 from typing import Any, Iterator
@@ -64,24 +65,33 @@ class LlamaClient:
             yield from self._parse_sse(response)
 
     def _parse_sse(self, response) -> Iterator[StreamEvent]:
-        for raw_line in response:
-            line = raw_line.decode("utf-8", "replace").strip()
-            if not line.startswith("data:"):
-                continue
-            data = line[len("data:"):].strip()
-            if data == "[DONE]":
-                return
-            try:
-                chunk = json.loads(data)
-            except json.JSONDecodeError:
-                continue  # partial chunk; skip per spec
-            choices = chunk.get("choices") or []
-            if not choices:
-                continue
-            choice = choices[0]
-            delta = choice.get("delta") or {}
-            text = delta.get("content") or ""
-            tool_calls = delta.get("tool_calls")
-            finish = choice.get("finish_reason")
-            if text or tool_calls or finish:
-                yield StreamEvent(text=text, tool_calls=tool_calls, finish=finish)
+        saw_done = False
+        try:
+            for raw_line in response:
+                line = raw_line.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                data = line[len("data:"):].strip()
+                if data == "[DONE]":
+                    saw_done = True
+                    return
+                try:
+                    chunk = json.loads(data)
+                except json.JSONDecodeError:
+                    continue  # partial chunk; skip per spec
+                choices = chunk.get("choices") or []
+                if not choices:
+                    continue
+                choice = choices[0]
+                delta = choice.get("delta") or {}
+                text = delta.get("content") or ""
+                tool_calls = delta.get("tool_calls")
+                finish = choice.get("finish_reason")
+                if text or tool_calls or finish:
+                    yield StreamEvent(text=text, tool_calls=tool_calls, finish=finish)
+        except (http.client.HTTPException, OSError) as e:
+            raise LlamaServerError(f"model server stream failed: {e}") from e
+        if not saw_done:
+            # A stream that ends without [DONE] died mid-turn; treat it as
+            # a server error, never as a completed turn.
+            raise LlamaServerError("stream ended without [DONE]")

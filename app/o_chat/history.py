@@ -30,6 +30,10 @@ class History:
         out = []
         for line in self._path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
-            if line:
+            if not line:
+                continue
+            try:
                 out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue  # spec 8: one corrupt line must not break the chat
         return out

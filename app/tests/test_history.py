@@ -63,6 +63,19 @@ def test_missing_file_yields_empty(tmp_path):
     assert History(tmp_path / "nope.jsonl").messages() == []
 
 
+def test_corrupt_lines_skipped(tmp_path):
+    path = tmp_path / "h.jsonl"
+    path.write_text(
+        '{"role": "user", "content": "good"}\n'
+        "THIS IS NOT JSON\n"
+        '{"role": "assistant", "content": "fine"}\n'
+    )
+    assert History(path).messages() == [
+        {"role": "user", "content": "good"},
+        {"role": "assistant", "content": "fine"},
+    ]
+
+
 def test_plain_message_shape_omits_optional_fields(tmp_path):
     h = History(tmp_path / "h.jsonl")
     h.append(role="user", content="hi")

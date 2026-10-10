@@ -112,6 +112,24 @@ def test_grammar_omitted_when_not_passed():
     assert "grammar" not in req
 
 
+def test_midstream_close_without_done_raises(tmp_path=None):
+    # Server closes cleanly after partial text but never sends [DONE]:
+    # must surface as LlamaServerError, not a fabricated "done" turn.
+    body = 'data: {"choices":[{"delta":{"content":"partial"}}]\n\n'
+    with MockLlamaServer([{"no_done": body}]) as mock:
+        with pytest.raises(LlamaServerError):
+            list(LlamaClient(mock.url).chat([{"role": "user", "content": "x"}]))
+
+
+def test_midstream_broken_chunked_raises_not_raw():
+    # Server declares more bytes than it sends: http.client raises
+    # IncompleteRead — must be wrapped in LlamaServerError.
+    body = 'data: {"choices":[{"delta":{"content":"x"}}]}\n\n'
+    with MockLlamaServer([{"truncate": body}]) as mock:
+        with pytest.raises(LlamaServerError):
+            list(LlamaClient(mock.url).chat([{"role": "user", "content": "x"}]))
+
+
 def test_http_500_raises():
     with MockLlamaServer([500]) as mock:
         with pytest.raises(LlamaServerError):
